@@ -1,37 +1,33 @@
 import asyncio
-from config import gemini_model
-from services.metrics_service import query_metrics
-from services.anomaly_service import detect_anomalies
-from services.notify_service import notify
-from utils.prompt_utils import FORMAT_REPORT_PROMPT, render_prompt
-
+from plugins.metrics_plugin import MetricsPlugin
+from plugins.report_plugin import ReportPlugin
 
 async def run_agent():
     context = {}
 
-    context = await query_metrics(context)
-    context = await detect_anomalies(context)
+    metrics_plugin = MetricsPlugin()
+    report_plugin = ReportPlugin()
 
-    metrics = context["metrics"]
-    prompt_text = render_prompt(
-        FORMAT_REPORT_PROMPT,
-        {
-            "restaurant_name": metrics["restaurant_name"],
-            "top_products": metrics["top_products"],
-            "avg_prep": metrics["avg_prep_seconds"],
-            "avg_prep_30d": metrics["avg_prep_30d_seconds"],
-            "alerts": context["alerts"],
-        },
+    metrics = metrics_plugin.query_metrics()
+    alerts = metrics_plugin.detect_anomalies(metrics)
+
+    report_text = await report_plugin.generate_report(
+        restaurant_name=metrics["restaurant_name"],
+        top_products=metrics["top_products"],
+        avg_prep_seconds=metrics["avg_prep_seconds"],
+        avg_prep_30d_seconds=metrics["avg_prep_30d_seconds"],
+        alerts=alerts,
     )
-    response = await asyncio.to_thread(gemini_model.generate_content, prompt_text)
-    context["report"] = response.text
-
-    await notify(context)
+    context["metrics"] = metrics
+    context["alerts"] = alerts
+    context["report"] = report_text
 
 
 async def chat_loop():
     print("\nDigite mensagens para o agente. Comandos disponíveis: /metrics, /anomalies, /report, /exit")
     context = {}
+    metrics_plugin = MetricsPlugin()
+    report_plugin = ReportPlugin()
     while True:
         try:
             user_input = await asyncio.to_thread(input, "\nVocê: ")
@@ -46,41 +42,38 @@ async def chat_loop():
             break
 
         if user_input.strip().lower() == "/metrics":
-            context = await query_metrics(context)
+            metrics = metrics_plugin.query_metrics()
+            context["metrics"] = metrics
             print("Agente: métricas atualizadas.")
             continue
 
         if user_input.strip().lower() == "/anomalies":
             if "metrics" not in context:
-                context = await query_metrics(context)
-            context = await detect_anomalies(context)
+                context["metrics"] = metrics_plugin.query_metrics()
+            alerts = metrics_plugin.detect_anomalies(context["metrics"])
+            context["alerts"] = alerts
             print(f"Agente: alertas -> {context.get('alerts', [])}")
             continue
 
         if user_input.strip().lower() == "/report":
             if "metrics" not in context:
-                context = await query_metrics(context)
+                context["metrics"] = metrics_plugin.query_metrics()
             if "alerts" not in context:
-                context = await detect_anomalies(context)
+                context["alerts"] = metrics_plugin.detect_anomalies(context["metrics"])
 
-            metrics = context["metrics"]
-            prompt_text = render_prompt(
-                FORMAT_REPORT_PROMPT,
-                {
-                    "restaurant_name": metrics["restaurant_name"],
-                    "top_products": metrics["top_products"],
-                    "avg_prep": metrics["avg_prep_seconds"],
-                    "avg_prep_30d": metrics["avg_prep_30d_seconds"],
-                    "alerts": context["alerts"],
-                },
+            m = context["metrics"]
+            text = await report_plugin.generate_report(
+                restaurant_name=m["restaurant_name"],
+                top_products=m["top_products"],
+                avg_prep_seconds=m["avg_prep_seconds"],
+                avg_prep_30d_seconds=m["avg_prep_30d_seconds"],
+                alerts=context["alerts"],
             )
-            response = await asyncio.to_thread(gemini_model.generate_content, prompt_text)
-            text = response.text if hasattr(response, "text") else str(response)
             print("\n=== Relatório ===\n" + text)
             continue
 
-        response = await asyncio.to_thread(gemini_model.generate_content, user_input)
-        text = response.text if hasattr(response, "text") else str(response)
+        # Fallback: gerar resposta livre do Gemini via conector do plugin de relatório
+        text = await report_plugin._chat.complete(user_input)
         print(f"Agente: {text}")
 
 
