@@ -62,21 +62,3 @@ main.py
 requirements.txt
 .env
 ```
-
-### Uso com Semantic Kernel (Gemini)
-Este projeto foi adaptado para um estilo de orquestração com Semantic Kernel (SK) mantendo o backend Gemini.
-
-1) Instale SK:
-```bash
-pip install semantic-kernel
-```
-
-2) Plugins/Conectores:
-- `connectors/gemini_connector.py`: wrapper simples para chamadas ao Gemini
-- `plugins/metrics_plugin.py`: funções nativas (métricas e anomalias)
-- `plugins/report_plugin.py`: função assíncrona que gera relatório via Gemini
-
-3) Execução: o `agent.py` utiliza os plugins para `/metrics`, `/anomalies`, `/report`.
-
-
-
