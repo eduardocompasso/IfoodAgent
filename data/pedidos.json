@@ -1,0 +1,197 @@
+{
+  "restaurante": {
+    "id": 101,
+    "nome": "Tapioca da Ju",
+    "categoria": "Comida Brasileira",
+    "endereco": "Rua Boa Vista, 321, Recife - PE",
+    "avaliacao": 4.6
+  },
+  "pedidos": [
+    {
+      "id": 5010,
+      "cliente": {
+        "id": 201,
+        "nome": "Carlos Henrique",
+        "endereco_entrega": "Av. Recife, 789, Recife - PE"
+      },
+      "data_pedido": "2025-09-30T11:05:00",
+      "dia_semana": "Terça-feira",
+      "data_recebimento": "2025-09-30T11:06:30",
+      "data_envio": "2025-09-30T11:18:00",
+      "status": "Saiu para entrega",
+      "itens": [
+        {
+          "nome": "Tapioca de Frango com Catupiry",
+          "quantidade": 1,
+          "preco_unitario": 18.0
+        },
+        {
+          "nome": "Suco de Acerola 500ml",
+          "quantidade": 1,
+          "preco_unitario": 6.5
+        }
+      ],
+      "total": 24.5,
+      "forma_pagamento": "Pix"
+    },
+    {
+      "id": 5011,
+      "cliente": {
+        "id": 202,
+        "nome": "Larissa Gomes",
+        "endereco_entrega": "Rua das Palmeiras, 444, Recife - PE"
+      },
+      "data_pedido": "2025-09-29T12:40:00",
+      "dia_semana": "Segunda-feira",
+      "data_recebimento": "2025-09-29T12:41:10",
+      "data_envio": "2025-09-29T12:58:00",
+      "status": "Entregue",
+      "itens": [
+        {
+          "nome": "Tapioca de Carne de Sol com Queijo Coalho",
+          "quantidade": 1,
+          "preco_unitario": 20.0
+        }
+      ],
+      "total": 20.0,
+      "forma_pagamento": "Cartão de crédito"
+    },
+    {
+      "id": 5012,
+      "cliente": {
+        "id": 203,
+        "nome": "Marcos Vinícius",
+        "endereco_entrega": "Travessa Brasil, 100, Recife - PE"
+      },
+      "data_pedido": "2025-09-28T13:15:00",
+      "dia_semana": "Domingo",
+      "data_recebimento": null,
+      "data_envio": null,
+      "status": "Pendente",
+      "itens": [
+        {
+          "nome": "Tapioca Vegana com Legumes",
+          "quantidade": 2,
+          "preco_unitario": 16.5
+        }
+      ],
+      "total": 33.0,
+      "forma_pagamento": "Dinheiro"
+    },
+    {
+      "id": 5013,
+      "cliente": {
+        "id": 204,
+        "nome": "Juliana Azevedo",
+        "endereco_entrega": "Rua do Sol, 22, Recife - PE"
+      },
+      "data_pedido": "2025-09-28T19:20:00",
+      "dia_semana": "Domingo",
+      "data_recebimento": "2025-09-28T19:21:00",
+      "data_envio": "2025-09-28T19:40:00",
+      "status": "Entregue",
+      "itens": [
+        {
+          "nome": "Tapioca Doce de Goiabada com Queijo",
+          "quantidade": 1,
+          "preco_unitario": 14.0
+        }
+      ],
+      "total": 14.0,
+      "forma_pagamento": "Pix"
+    },
+    {
+      "id": 5014,
+      "cliente": {
+        "id": 205,
+        "nome": "Paulo Ricardo",
+        "endereco_entrega": "Rua São João, 87, Recife - PE"
+      },
+      "data_pedido": "2025-09-27T08:45:00",
+      "dia_semana": "Sábado",
+      "data_recebimento": "2025-09-27T08:46:00",
+      "data_envio": "2025-09-27T09:00:00",
+      "status": "Entregue",
+      "itens": [
+        {
+          "nome": "Cuscuz com Ovo",
+          "quantidade": 1,
+          "preco_unitario": 10.0
+        },
+        {
+          "nome": "Café Preto",
+          "quantidade": 1,
+          "preco_unitario": 3.5
+        }
+      ],
+      "total": 13.5,
+      "forma_pagamento": "Dinheiro"
+    },
+    {
+      "id": 5015,
+      "cliente": {
+        "id": 206,
+        "nome": "Renata Silva",
+        "endereco_entrega": "Av. Beira Rio, 300, Recife - PE"
+      },
+      "data_pedido": "2025-09-26T21:30:00",
+      "dia_semana": "Sexta-feira",
+      "data_recebimento": "2025-09-26T21:31:00",
+      "data_envio": "2025-09-26T21:50:00",
+      "status": "Saiu para entrega",
+      "itens": [
+        {
+          "nome": "Tapioca de Calabresa com Queijo",
+          "quantidade": 1,
+          "preco_unitario": 18.0
+        }
+      ],
+      "total": 18.0,
+      "forma_pagamento": "Cartão de débito"
+    },
+    {
+      "id": 5016,
+      "cliente": {
+        "id": 207,
+        "nome": "João Lucas",
+        "endereco_entrega": "Rua Nova, 999, Recife - PE"
+      },
+      "data_pedido": "2025-09-25T15:10:00",
+      "dia_semana": "Quinta-feira",
+      "data_recebimento": "2025-09-25T15:12:00",
+      "data_envio": "2025-09-25T15:29:00",
+      "status": "Entregue",
+      "itens": [
+        {
+          "nome": "Tapioca de Frango com Queijo",
+          "quantidade": 2,
+          "preco_unitario": 17.0
+        }
+      ],
+      "total": 34.0,
+      "forma_pagamento": "Pix"
+    },
+    {
+      "id": 5017,
+      "cliente": {
+        "id": 208,
+        "nome": "Luciana Teixeira",
+        "endereco_entrega": "Alameda Rio Branco, 88, Recife - PE"
+      },
+      "data_pedido": "2025-09-24T10:20:00",
+      "dia_semana": "Quarta-feira",
+      "data_recebimento": null,
+      "data_envio": null,
+      "status": "Pendente",
+      "itens": [
+        {
+          "nome": "Tapioca de Banana com Mel",
+          "quantidade": 1,
+          "preco_unitario": 12.0
+        }
+      ],
+      "total": 12.0,
+      "forma_pagamento": "Cartão de crédito"
+    }
+  ]
+}

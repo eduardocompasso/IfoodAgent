@@ -1,6 +1,14 @@
 import asyncio
+import json
 from plugins.metrics_plugin import MetricsPlugin
 from plugins.report_plugin import ReportPlugin
+
+try:
+    with open('data/pedidos.json', 'r', encoding='utf-8') as f:
+        PEDIDOS_JSON_STR = f.read()
+except FileNotFoundError:
+    print("Erro: Arquivo 'pedidos.json' não encontrado. As métricas não funcionarão.")
+    PEDIDOS_JSON_STR = "{}"
 
 async def run_agent():
     context = {}
@@ -8,7 +16,8 @@ async def run_agent():
     metrics_plugin = MetricsPlugin()
     report_plugin = ReportPlugin()
 
-    metrics = metrics_plugin.query_metrics()
+
+    metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
     alerts = metrics_plugin.detect_anomalies(metrics)
 
     report_text = await report_plugin.generate_report(
@@ -28,6 +37,7 @@ async def chat_loop():
     context = {}
     metrics_plugin = MetricsPlugin()
     report_plugin = ReportPlugin()
+
     while True:
         try:
             user_input = await asyncio.to_thread(input, "\nVocê: ")
@@ -42,14 +52,15 @@ async def chat_loop():
             break
 
         if user_input.strip().lower() == "/metrics":
-            metrics = metrics_plugin.query_metrics()
+            metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
             context["metrics"] = metrics
             print("Agente: métricas atualizadas.")
+            print(metrics)
             continue
 
         if user_input.strip().lower() == "/anomalies":
             if "metrics" not in context:
-                context["metrics"] = metrics_plugin.query_metrics()
+                context["metrics"] = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
             alerts = metrics_plugin.detect_anomalies(context["metrics"])
             context["alerts"] = alerts
             print(f"Agente: alertas -> {context.get('alerts', [])}")
@@ -57,7 +68,7 @@ async def chat_loop():
 
         if user_input.strip().lower() == "/report":
             if "metrics" not in context:
-                context["metrics"] = metrics_plugin.query_metrics()
+                context["metrics"] = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
             if "alerts" not in context:
                 context["alerts"] = metrics_plugin.detect_anomalies(context["metrics"])
 
