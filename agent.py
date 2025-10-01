@@ -60,6 +60,20 @@ async def chat_loop():
             print(f"Nome do Restaurante: {metrics.get('restaurant_name')}")
             print(f"Valor total vendido: {metrics.get('grand_total_sold')}")
 
+            avg_seconds_overall = metrics.get('average_preparation_time_seconds', 0)
+            if avg_seconds_overall > 0:
+                avg_minutes_overall = avg_seconds_overall / 60
+                print(f" Tempo Médio de Preparo (Geral): {avg_minutes_overall:.2f} minutos")
+                
+                avg_by_day = metrics.get('average_prep_time_by_day_seconds', {})
+                if avg_by_day:
+                    print("  Análise por Dia da Semana:")
+                    for day, seconds in avg_by_day.items():
+                        if seconds > 0:
+                            minutes = seconds / 60
+                            print(f"    -{day}: {minutes:.2f} min")
+
+
             sales_month = metrics.get('sales_by_month', {})
 
             for month, month_data in sales_month.items():

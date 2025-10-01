@@ -34,6 +34,11 @@ class MetricsPlugin:
         grand_total_sold = 0.0
         sales_by_month = {}
 
+        prep_time_by_day = {
+            day: {'total_seconds': 0.0, 'count': 0} 
+            for day in ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+        }
+
         for pedido in pedidos:
             grand_total_sold += pedido["total"]
 
@@ -41,6 +46,16 @@ class MetricsPlugin:
                 pedido_dt = datetime.fromisoformat(pedido["data_pedido"])
                 month_year = pedido_dt.strftime("%Y-%m")
                 day_of_week = pedido["dia_semana"]
+
+                if pedido.get("data_recebimento") and pedido.get("data_envio"):
+                    recebimento_dt = datetime.fromisoformat(pedido["data_recebimento"])
+                    envio_dt = datetime.fromisoformat(pedido["data_envio"])
+                    
+                    prep_time_delta = envio_dt - recebimento_dt
+                    
+                    prep_time_by_day[day_of_week]['total_seconds'] += prep_time_delta.total_seconds()
+                    prep_time_by_day[day_of_week]['count'] += 1
+
             except (ValueError, TypeError, KeyError):
                 continue
 
@@ -56,6 +71,16 @@ class MetricsPlugin:
         for month_data in sales_by_month.values():
             month_data["total_value_sold"] = round(month_data["total_value_sold"], 2)
 
+        total_seconds_overall = sum(d['total_seconds'] for d in prep_time_by_day.values())
+        total_orders_overall = sum(d['count'] for d in prep_time_by_day.values())
+        
+        average_prep_time_overall_seconds = total_seconds_overall / total_orders_overall if total_orders_overall > 0 else 0
+        
+        avg_prep_time_by_day_seconds = {
+            day: int(data['total_seconds'] / data['count']) if data['count'] > 0 else 0
+            for day, data in prep_time_by_day.items()
+        }
+
         product_counter = Counter()
         for pedido in pedidos:
             for item in pedido.get("itens", []):
@@ -68,6 +93,8 @@ class MetricsPlugin:
         return {
             "restaurant_name": restaurant_name,
             "grand_total_sold": round(grand_total_sold, 2),
+            "average_preparation_time_seconds": int(average_prep_time_overall_seconds),
+            "average_prep_time_by_day_seconds": avg_prep_time_by_day_seconds,
             "sales_by_month": sales_by_month,
             "top_products": top_products,
         }
