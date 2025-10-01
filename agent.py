@@ -28,12 +28,13 @@ async def run_agent():
         alerts=alerts,
     )
     context["metrics"] = metrics
+    context["clients_metrics"] = metrics
     context["alerts"] = alerts
     context["report"] = report_text
 
 
 async def chat_loop():
-    print("\nDigite mensagens para o agente. Comandos disponíveis: /metrics, /anomalies, /report, /exit")
+    print("\nDigite mensagens para o agente. Comandos disponíveis: /metrics, /clients_metrics, /anomalies, /report, /exit")
     context = {}
     metrics_plugin = MetricsPlugin()
     report_plugin = ReportPlugin()
@@ -52,10 +53,43 @@ async def chat_loop():
             break
 
         if user_input.strip().lower() == "/metrics":
-            metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
+            if "metrics" not in context:
+                metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
             context["metrics"] = metrics
-            print("Agente: métricas atualizadas.")
-            print(metrics)
+
+            print(f"Nome do Restaurante: {metrics.get('restaurant_name')}")
+            print(f"Valor total vendido: {metrics.get('grand_total_sold')}")
+
+            sales_month = metrics.get('sales_by_month', {})
+
+            for month, month_data in sales_month.items():
+                month_total = month_data.get('total_value_sold', 0.0)
+                print(f"Mes: {month}")
+                print(f"    Valor Vendido do mes: R$ {month_total:.2f}")
+                
+                days_data = month_data.get('sales_by_day', {})
+                if not days_data:
+                    print("     Nenhuma venda nesse mes")
+                else:
+                    print("     Pedidos por dia da semana:")
+                    for day, count in sorted(days_data.items()):
+                        print(f"        -{day}: {count} pedido(s)")
+
+            print("TOP 3 produtos mais vendidos:")
+            top_products = metrics.get('top_products', [])
+            if not top_products:
+                print("     Nenhum produto para exibir")
+            else:
+                for i, product in enumerate(top_products, 1):
+                    print(f"    {i}. {product.get('name')} - {product.get('sold')} unidades")
+
+            continue
+
+        if user_input.strip().lower() == "/clients_metrics":
+            if "clients_metrics" not in context:
+                metrics = metrics_plugin.query_clients_metrics(PEDIDOS_JSON_STR)
+            for name, values in metrics.items():
+                print(f"{name} -> num_pedidos: {values['numero_de_pedidos']} | total_gasto: {values['valor_total_gasto']}")
             continue
 
         if user_input.strip().lower() == "/anomalies":
