@@ -2,9 +2,12 @@ import streamlit as st
 import asyncio
 import json
 import pandas as pd
-import plotly.express as px
+import os
+from datetime import date, timedelta, datetime
+from collections import Counter
 from plugins.metrics_plugin import MetricsPlugin
 from plugins.report_plugin import ReportPlugin
+from plugins.anomalie_plugin import AnomaliePlugin
 
 st.set_page_config(
     page_title="iFood Analytics Agent",
@@ -12,12 +15,8 @@ st.set_page_config(
     layout="wide"
 )
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "metrics" not in st.session_state:
-    st.session_state.metrics = None
-if "alerts" not in st.session_state:
-    st.session_state.alerts = None
+if "messages" not in st.session_state: st.session_state.messages = []
+if "metrics" not in st.session_state: st.session_state.metrics = None
 
 st.title("👤 iFood Analytics Agent")
 st.markdown("""
@@ -28,8 +27,9 @@ Faça perguntas sobre vendas, produtos, tempos de preparo e muito mais!
 st.sidebar.title("📊 Painel Rápido")
 st.sidebar.markdown("### Comandos Disponíveis")
 st.sidebar.markdown("""
-- `/metrics` - Atualizar métricas
-- `/anomalies` - Detectar anomalias
+- `/metrics` - Atualizar métricas gerais
+- `/clients_metrics` - Ver métricas de clientes
+- `/anomalies` - Detectar anomalias com IA
 - `/report` - Gerar relatório completo
 - `/clear` - Limpar conversa
 """)
@@ -37,10 +37,10 @@ st.sidebar.markdown("""
 try:
     with open('data/pedidos.json', 'r', encoding='utf-8') as f:
         PEDIDOS_JSON_STR = f.read()
-    pedidos = json.loads(PEDIDOS_JSON_STR)
     
     metrics_plugin = MetricsPlugin()
     report_plugin = ReportPlugin()
+    anomalie_plugin = AnomaliePlugin()
     
     if st.session_state.metrics is None:
         st.session_state.metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
@@ -50,134 +50,145 @@ try:
         st.sidebar.markdown("### Métricas Rápidas")
         m = st.session_state.metrics
         st.sidebar.metric("Restaurante", m.get('restaurant_name', 'N/A'))
-        if m.get('avg_prep_seconds'):
-            avg_min = round(m['avg_prep_seconds'] / 60, 1)
-            st.sidebar.metric("Tempo Médio Preparo", f"{avg_min} min")
+        
+        if 'avg_prep_30d_seconds' in m:
+            avg_min_today = round(m.get('avg_prep_30d_seconds', 0) / 60, 1)
+            overall_avg = m.get('avg_prep_seconds', 0)
+            delta_vs_overall = m.get('avg_prep_30d_seconds', 0) - overall_avg
+            st.sidebar.metric(
+                label="Preparo (Ultimos 30 dias)", 
+                value=f"{avg_min_today} min",
+                delta=f"{round(delta_vs_overall / 60, 1)} min vs Geral",
+                delta_color="inverse"
+            )
+        
         if m.get('top_products'):
             st.sidebar.markdown(f"**Mais vendido:** {m['top_products'][0]['name']}")
-    
+
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-    
+            st.markdown(message["content"], unsafe_allow_html=True)
+            
     if prompt := st.chat_input("Digite sua mensagem ou comando..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
         
         with st.chat_message("assistant"):
-            with st.spinner("Pensando..."):
+            with st.spinner("Analisando..."):
                 response = ""
                 
                 if prompt.strip().lower() == "/clear":
                     st.session_state.messages = []
-                    response = "✅ Conversa limpa!"
                     st.rerun()
-                
+
                 elif prompt.strip().lower() == "/metrics":
                     metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
                     st.session_state.metrics = metrics
                     
-                    response = f"""📊 **Métricas Atualizadas**
-                                        
-                    **Restaurante:** {metrics.get('restaurant_name', 'N/A')}
-                    **Tempo Médio de Preparo:** {round(metrics.get('avg_prep_seconds', 0) / 60, 1)} minutos
-                    **Tempo Médio (30 dias):** {round(metrics.get('avg_prep_30d_seconds', 0) / 60, 1)} minutos
+                    response = f"### 📊 Métricas Gerais Atualizadas\n\n"
+                    response += f"**Valor Total Vendido:** R$ {metrics.get('grand_total_sold', 0.0):.2f}\n\n"
+                    response += "**Análise de Tempo de Preparo:**\n"
+                    
+                    avg_today_s = metrics.get('avg_prep_today_seconds', 0)
+                    avg_30d_s = metrics.get('avg_prep_30d_seconds', 0)
+                    avg_overall_s = metrics.get('avg_prep_seconds', 0)
 
-                    **Top 3 Produtos Mais Vendidos:**
-                    """
-                    for i, prod in enumerate(metrics.get('top_products', [])[:3], 1):
-                        response += f"\n{i}. {prod['name']} - {prod['sold']} vendas"
-                
-                elif prompt.strip().lower() == "/anomalies":
-                    if not st.session_state.metrics:
-                        st.session_state.metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
+                    response += f"- **Hoje:** {round(avg_today_s / 60, 1)} min ({avg_today_s}s)\n"
+                    response += f"- **Últimos 30 Dias:** {round(avg_30d_s / 60, 1)} min ({avg_30d_s}s)\n"
+                    response += f"- **Geral (todo o período):** {round(avg_overall_s / 60, 1)} min ({avg_overall_s}s)\n"
                     
-                    alerts = metrics_plugin.detect_anomalies(st.session_state.metrics)
-                    st.session_state.alerts = alerts
+                    st.markdown(response)
+
+                elif prompt.strip().lower() == "/clients_metrics":
+                    client_metrics = metrics_plugin.query_clients_metrics(PEDIDOS_JSON_STR)
                     
-                    if alerts:
-                        response = "🔔 **Alertas Detectados:**\n\n"
-                        for alert in alerts:
-                            response += f"⚠️ {alert}\n\n"
+                    st.markdown("### 👥 Métricas de Clientes")
+
+                    if client_metrics:
+                        df = pd.DataFrame.from_dict(client_metrics, orient='index')
+                        df.columns = ["Nº de Pedidos", "Total Gasto (R$)"]
+                        st.dataframe(df)
+
+                        response_str = "### 👥 Métricas de Clientes\n\n"
+                        response_str += "| Cliente | Nº de Pedidos | Total Gasto (R$) |\n| --- | --- | --- |\n"
+                        
+                        for name, data in client_metrics.items():
+                            response_str += f"| {name} | {data['numero_de_pedidos']} | R$ {data['valor_total_gasto']:.2f} |\n"
+                        
+                        response = response_str
                     else:
-                        response = "✅ Nenhuma anomalia detectada. Tudo funcionando perfeitamente!"
-                
+                        response = "Nenhuma métrica de cliente encontrada."
+                        st.write(response)
+
+                elif prompt.strip().lower() == "/anomalies":
+                    metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
+                    response = asyncio.run(anomalie_plugin.detect_anomalies_with_ai(metrics=metrics))
+                    st.markdown(response)
+
                 elif prompt.strip().lower() == "/report":
-                    if not st.session_state.metrics:
-                        st.session_state.metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
-                    if not st.session_state.alerts:
-                        st.session_state.alerts = metrics_plugin.detect_anomalies(st.session_state.metrics)
-                    
-                    m = st.session_state.metrics
-                    report_json = asyncio.run(
+                    st.info("Gerando relatório completo...")
+                    metrics = metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
+                    st.session_state.metrics = metrics
+
+                    st.info("Detectando anomalias com IA...")
+                    alerts_text = asyncio.run(anomalie_plugin.detect_anomalies_with_ai(metrics=metrics))
+                    alerts_list = [line.strip("* ") for line in alerts_text.split('\n') if line.strip()]
+
+                    st.info("Compilando o relatório final...")
+                    report_json_str = asyncio.run(
                         report_plugin.generate_report(
-                            restaurant_name=m.get("restaurant_name", "Seu Restaurante"),
-                            top_products=m.get("top_products", []),
-                            avg_prep_seconds=m.get("avg_prep_seconds", 0),
-                            avg_prep_30d_seconds=m.get("avg_prep_30d_seconds", 0),
-                            alerts=st.session_state.alerts,
+                            restaurant_name=metrics.get("restaurant_name", "N/A"),
+                            top_products=metrics.get("top_products", []),
+                            avg_prep_seconds=metrics.get("avg_prep_seconds", 0),
+                            avg_prep_today_seconds=metrics.get("avg_prep_today_seconds", 0),
+                            avg_prep_30d_seconds=metrics.get("avg_prep_30d_seconds", 0),
+                            alerts=alerts_list,
                         )
                     )
                     
                     try:
-                        report_data = json.loads(report_json)
-                        response = f"""📄 **{report_data.get('title', 'Relatório Completo')}**
-
-                        **Resumo:**
-                        {report_data.get('summary', 'N/A')}
-
-                        **Produtos Principais:**
-                        """
-                        for i, prod in enumerate(report_data.get('top_products', []), 1):
-                            response += f"{i}. {prod}\n"
-                        
-                        response += f"""
-                        **Tempo de Preparo:**
-                        - Atual: {report_data.get('avg_prep', 0)} segundos ({round(report_data.get('avg_prep', 0) / 60, 1)} min)
-                        - Média 30 dias: {report_data.get('avg_prep_30d', 0)} segundos ({round(report_data.get('avg_prep_30d', 0) / 60, 1)} min)
-
-                        **Alertas:**
-                        """
-                        alerts_list = report_data.get('alerts', [])
-                        if alerts_list:
-                            for alert in alerts_list:
-                                response += f"⚠️ {alert}\n"
-                        else:
-                            response += "✅ Nenhum alerta\n"
-                        
-                        response += "\n**Recomendações:**\n"
-                        for i, rec in enumerate(report_data.get('recommendations', []), 1):
-                            response += f"{i}. {rec}\n"
+                        report_data = json.loads(report_json_str)
+                        response = f"### 📄 {report_data.get('title', 'Relatório de Performance')}\n\n"
+                        response += f"**Resumo:** {report_data.get('summary', 'N/A')}\n\n"
+                        response += "**Recomendações da IA:**\n"
+                        for rec in report_data.get('recommendations', []):
+                            response += f"- {rec}\n"
                     except json.JSONDecodeError:
-                        response = f"📄 **Relatório Completo**\n\n{report_json}"
-                
-                else:
-                    context_prompt = prompt
-                    if st.session_state.metrics:
-                        m = st.session_state.metrics
-                        top_prods = ", ".join([f"{p['name']} ({p['sold']} vendas)" for p in m.get('top_products', [])[:3]])
-                        context_info = f"""
-                        Contexto das métricas do restaurante:
-                        - Nome: {m.get('restaurant_name', 'N/A')}
-                        - Tempo médio de preparo: {round(m.get('avg_prep_seconds', 0) / 60, 1)} minutos
-                        - Tempo médio (30 dias): {round(m.get('avg_prep_30d_seconds', 0) / 60, 1)} minutos
-                        - Top 3 produtos: {top_prods}
-
-                        Pergunta do usuário: {prompt}
-                        """
-                        context_prompt = context_info
+                        response = f"**Ocorreu um erro ao formatar o relatório. Resposta da IA:**\n\n{report_json_str}"
                     
-                    response = asyncio.run(report_plugin._chat.complete(context_prompt))
+                    reports_dir = "reports"
+                    os.makedirs(reports_dir, exist_ok=True)
+                    
+                    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                    file_name = f"report_{timestamp}.md"
+                    file_path = os.path.join(reports_dir, file_name)
+                    
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(response)
+                    
+                    st.success(f"Relatório salvo em: `{file_path}`")
+                    
+                    st.markdown(response)
+
+                else:
+                    m = st.session_state.metrics if st.session_state.metrics else metrics_plugin.query_metrics(PEDIDOS_JSON_STR)
+                    context_info = f"""
+                    Contexto para responder a pergunta:
+                    - Desempenho de hoje (tempo de preparo): {m.get('avg_prep_today_seconds', 0)} segundos.
+                    - Desempenho geral (tempo de preparo): {m.get('avg_prep_seconds', 0)} segundos.
+                    - Total vendido no geral: R$ {m.get('grand_total_sold', 0.0)}.
+
+                    Pergunta do usuário: {prompt}
+                    """
+                    response = asyncio.run(report_plugin._chat.complete(context_info))
+                    st.markdown(response)
                 
-                st.markdown(response)
-        
-        st.session_state.messages.append({"role": "assistant", "content": response})
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.rerun()
 
 except FileNotFoundError:
-    st.error("❌ Arquivo 'data/pedidos.json' não encontrado. Por favor, verifique o caminho do arquivo.")
-except json.JSONDecodeError:
-    st.error("❌ Erro ao ler o arquivo de pedidos. Verifique se o formato JSON está correto.")
+    st.error("❌ Arquivo 'data/pedidos.json' não encontrado.")
 except Exception as e:
     st.error(f"❌ Ocorreu um erro inesperado: {str(e)}")
 

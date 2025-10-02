@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from collections import Counter
 from semantic_kernel.functions import kernel_function
 
@@ -25,76 +25,76 @@ class MetricsPlugin:
 
         return client_metrics
     
-    
     def _calculate_metrics_from_data(self, pedidos_data: dict) -> dict:
-        
         restaurant_name = pedidos_data.get("restaurante", {}).get("nome", "Nome não encontrado")
         pedidos = pedidos_data.get("pedidos", [])
         
+        today = date.today()
+        thirty_days_ago = today - timedelta(days=30)
+
+        today_prep_seconds = 0.0
+        today_orders_count = 0
+        last_30d_prep_seconds = 0.0
+        last_30d_orders_count = 0
+        overall_prep_seconds = 0.0
+        overall_orders_count = 0
+        
+        prep_time_by_day = { day: {'total_seconds': 0.0, 'count': 0} for day in ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]}
         grand_total_sold = 0.0
         sales_by_month = {}
-
-        prep_time_by_day = {
-            day: {'total_seconds': 0.0, 'count': 0} 
-            for day in ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
-        }
+        product_counter = Counter()
 
         for pedido in pedidos:
             grand_total_sold += pedido["total"]
-
             try:
                 pedido_dt = datetime.fromisoformat(pedido["data_pedido"])
-                month_year = pedido_dt.strftime("%Y-%m")
-                day_of_week = pedido["dia_semana"]
+                pedido_date = pedido_dt.date()
 
                 if pedido.get("data_recebimento") and pedido.get("data_envio"):
                     recebimento_dt = datetime.fromisoformat(pedido["data_recebimento"])
                     envio_dt = datetime.fromisoformat(pedido["data_envio"])
+                    prep_time_seconds = (envio_dt - recebimento_dt).total_seconds()
+
+                    overall_prep_seconds += prep_time_seconds
+                    overall_orders_count += 1
                     
-                    prep_time_delta = envio_dt - recebimento_dt
-                    
-                    prep_time_by_day[day_of_week]['total_seconds'] += prep_time_delta.total_seconds()
-                    prep_time_by_day[day_of_week]['count'] += 1
+                    prep_time_by_day[pedido["dia_semana"]]['total_seconds'] += prep_time_seconds
+                    prep_time_by_day[pedido["dia_semana"]]['count'] += 1
+
+                    if pedido_date == today:
+                        today_prep_seconds += prep_time_seconds
+                        today_orders_count += 1
+                    elif thirty_days_ago <= pedido_date < today:
+                        last_30d_prep_seconds += prep_time_seconds
+                        last_30d_orders_count += 1
+                
+                month_year = pedido_dt.strftime("%Y-%m")
+                if month_year not in sales_by_month:
+                    sales_by_month[month_year] = {"total_value_sold": 0.0, "sales_by_day": Counter()}
+                sales_by_month[month_year]["total_value_sold"] += pedido["total"]
+                sales_by_month[month_year]["sales_by_day"][pedido["dia_semana"]] += 1
+                for item in pedido.get("itens", []):
+                    product_counter[item["nome"]] += item["quantidade"]
 
             except (ValueError, TypeError, KeyError):
                 continue
-
-            if month_year not in sales_by_month:
-                sales_by_month[month_year] = {
-                    "total_value_sold": 0.0,
-                    "sales_by_day": Counter()
-                }
-            
-            sales_by_month[month_year]["total_value_sold"] += pedido["total"]
-            sales_by_month[month_year]["sales_by_day"][day_of_week] += 1
         
+        avg_prep_today_seconds = int(today_prep_seconds / today_orders_count) if today_orders_count > 0 else 0
+        avg_prep_last_30d_seconds = int(last_30d_prep_seconds / last_30d_orders_count) if last_30d_orders_count > 0 else 0
+        avg_prep_overall_seconds = int(overall_prep_seconds / overall_orders_count) if overall_orders_count > 0 else 0
+        
+        avg_prep_time_by_day_seconds = { day: int(data['total_seconds'] / data['count']) if data['count'] > 0 else 0 for day, data in prep_time_by_day.items() }
         for month_data in sales_by_month.values():
             month_data["total_value_sold"] = round(month_data["total_value_sold"], 2)
-
-        total_seconds_overall = sum(d['total_seconds'] for d in prep_time_by_day.values())
-        total_orders_overall = sum(d['count'] for d in prep_time_by_day.values())
-        
-        average_prep_time_overall_seconds = total_seconds_overall / total_orders_overall if total_orders_overall > 0 else 0
-        
-        avg_prep_time_by_day_seconds = {
-            day: int(data['total_seconds'] / data['count']) if data['count'] > 0 else 0
-            for day, data in prep_time_by_day.items()
-        }
-
-        product_counter = Counter()
-        for pedido in pedidos:
-            for item in pedido.get("itens", []):
-                product_counter[item["nome"]] += item["quantidade"]
-        
-        top_products = [
-            {"name": name, "sold": count} for name, count in product_counter.most_common(3)
-        ]
+        top_products = [ {"name": name, "sold": count} for name, count in product_counter.most_common(3) ]
 
         return {
             "restaurant_name": restaurant_name,
             "grand_total_sold": round(grand_total_sold, 2),
-            "average_preparation_time_seconds": int(average_prep_time_overall_seconds),
-            "average_prep_time_by_day_seconds": avg_prep_time_by_day_seconds,
+            "avg_prep_today_seconds": avg_prep_today_seconds,
+            "avg_prep_30d_seconds": avg_prep_last_30d_seconds,
+            "avg_prep_seconds": avg_prep_overall_seconds,
+            "avg_prep_time_by_day_seconds": avg_prep_time_by_day_seconds,
             "sales_by_month": sales_by_month,
             "top_products": top_products,
         }
