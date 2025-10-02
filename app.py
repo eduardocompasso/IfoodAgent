@@ -10,7 +10,7 @@ from plugins.report_plugin import ReportPlugin
 from plugins.anomalie_plugin import AnomaliePlugin
 
 st.set_page_config(
-    page_title="Análise de Restaurante",
+    page_title="iFood Analytics Agent",
     page_icon="👤",
     layout="wide"
 )
@@ -18,13 +18,13 @@ st.set_page_config(
 if "messages" not in st.session_state: st.session_state.messages = []
 if "metrics" not in st.session_state: st.session_state.metrics = None
 
-st.title("👤 Agente de Análise de Restaurante")
+st.title("👤 iFood Analytics Agent")
 st.markdown("""
 Converse com o assistente de IA sobre as métricas do seu restaurante. 
 Faça perguntas sobre vendas, produtos, tempos de preparo e muito mais!
 """)
 
-st.sidebar.title("📊 Painel de Controle")
+st.sidebar.title("📊 Painel Rápido")
 st.sidebar.markdown("### Comandos Disponíveis")
 st.sidebar.markdown("""
 - `/metrics` - Atualizar métricas gerais
@@ -47,7 +47,7 @@ try:
     
     if st.session_state.metrics:
         st.sidebar.markdown("---")
-        st.sidebar.markdown("### Resumo Rápido")
+        st.sidebar.markdown("### Métricas Rápidas")
         m = st.session_state.metrics
         st.sidebar.metric("Restaurante", m.get('restaurant_name', 'N/A'))
         
